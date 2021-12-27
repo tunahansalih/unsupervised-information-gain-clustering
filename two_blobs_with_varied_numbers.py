@@ -11,11 +11,18 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import scale, MaxAbsScaler
 from tqdm import tqdm
 
-project_name = "two_circles"
+project_name = "two_blobs_varied_numbers"
 project = f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 os.makedirs(project, exist_ok=True)
 
-X, y = datasets.make_circles(n_samples=5000, shuffle=True, noise=0.1, factor=0.5, random_state=3333)
+X, y = datasets.make_blobs(n_samples=10000, n_features=2, centers=2, shuffle=True, random_state=170)
+X = np.vstack((X[y == 0][:4500], X[y == 1][:500]))
+y = np.concatenate((np.zeros(4500), np.ones(500)))
+
+rand_indices = np.random.permutation(len(X))
+X = X[rand_indices]
+y = y[rand_indices]
+
 X = scale(X)
 transformer = MaxAbsScaler().fit(X)
 X = transformer.transform(X)
@@ -49,7 +56,7 @@ def experiment(
         ]
     )
 
-    optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
     for epoch in range(1, 11):
         prog_bar = tqdm(range(len(X) // 100), desc=f"Training Epoch {epoch}")
@@ -122,11 +129,12 @@ def experiment(
                 axes[1, 1].scatter(
                     logit[:, 0], logit[:, 1], c=y, cmap=cm_bright, edgecolors="k"
                 )
-                score = metrics.normalized_mutual_info_score(y, predictions)
+                score_nmi = metrics.normalized_mutual_info_score(y, predictions)
+                score_rand = metrics.rand_score(y, predictions)
+                print(f"NMI: {score_nmi * 100:2f}% Rand: {score_rand * 100:2f}%")
                 plt.savefig(f"{project}/experiment_{experiment_no}_step_{global_step}")
 
-    return score
-
+    return score_nmi, score_rand
 
 if __name__ == "__main__":
     with open(f"{project}/experiments.csv", "w") as experiment_fh:
@@ -136,26 +144,39 @@ if __name__ == "__main__":
                 "experiment_no",
                 "learning_rate",
                 "balance_coefficient",
-                "score",
+                "score_nmi",
+                "score_rand",
             ],
         )
         experiment_csv.writeheader()
         i = 0
 
+        score_nmi = metrics.normalized_mutual_info_score(y, kmeans_labels)
+        score_rand = metrics.rand_score(y, kmeans_labels)
+        row = {
+            "experiment_no": i,
+            "score_nmi": score_nmi,
+            "score_rand": score_rand
+        }
+        print(f"NMI: {score_nmi * 100:2f}% Rand: {score_rand * 100:2f}%")
+
+        experiment_csv.writerow(row)
+
         for learning_rate in [0.05]:
-            for balance_coefficient in [1]:
+            for balance_coefficient in [0.1]:
                 experiment_config = {
                     "experiment_no": i,
                     "learning_rate": learning_rate,
                     "balance_coefficient": balance_coefficient,
 
                 }
-                score = experiment(**experiment_config)
+                score_nmi, score_rand = experiment(**experiment_config)
                 row = {
                     "experiment_no": i,
                     "learning_rate": learning_rate,
                     "balance_coefficient": balance_coefficient,
-                    "score": score
+                    "score_nmi": score_nmi,
+                    "score_rand": score_rand
                 }
                 experiment_csv.writerow(row)
                 i += 1

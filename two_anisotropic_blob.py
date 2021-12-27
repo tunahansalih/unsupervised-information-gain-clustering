@@ -11,11 +11,14 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import scale, MaxAbsScaler
 from tqdm import tqdm
 
-project_name = "no_structure"
+project_name = "two_anisotropic_blob"
 project = f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 os.makedirs(project, exist_ok=True)
 
-X, y = np.random.rand(5000, 2), np.zeros(5000)
+X, y = datasets.make_blobs(n_samples=5000, n_features=2, centers=2, shuffle=True, random_state=170, cluster_std=0.7)
+transformation = [[0.6, -0.6], [-0.4, 0.8]]
+X = np.dot(X, transformation)
+
 X = scale(X)
 transformer = MaxAbsScaler().fit(X)
 X = transformer.transform(X)

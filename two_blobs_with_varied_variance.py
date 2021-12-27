@@ -11,7 +11,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import scale, MaxAbsScaler
 from tqdm import tqdm
 
-project_name = "two_blobs_varies_variance"
+project_name = "two_blobs_varied_variance"
 project = f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 os.makedirs(project, exist_ok=True)
 
@@ -122,11 +122,12 @@ def experiment(
                 axes[1, 1].scatter(
                     logit[:, 0], logit[:, 1], c=y, cmap=cm_bright, edgecolors="k"
                 )
-                score = metrics.normalized_mutual_info_score(y, predictions)
+                score_nmi = metrics.normalized_mutual_info_score(y, predictions)
+                score_rand = metrics.rand_score(y, predictions)
+                print(f"NMI: {score_nmi * 100:2f}% Rand: {score_rand * 100:2f}%")
                 plt.savefig(f"{project}/experiment_{experiment_no}_step_{global_step}")
 
-    return score
-
+    return score_nmi, score_rand
 
 if __name__ == "__main__":
     with open(f"{project}/experiments.csv", "w") as experiment_fh:
@@ -136,11 +137,23 @@ if __name__ == "__main__":
                 "experiment_no",
                 "learning_rate",
                 "balance_coefficient",
-                "score",
+                "score_nmi",
+                "score_rand",
             ],
         )
         experiment_csv.writeheader()
         i = 0
+
+        score_nmi = metrics.normalized_mutual_info_score(y, kmeans_labels)
+        score_rand = metrics.rand_score(y, kmeans_labels)
+        row = {
+            "experiment_no": i,
+            "score_nmi": score_nmi,
+            "score_rand": score_rand
+        }
+        print(f"NMI: {score_nmi * 100:2f}% Rand: {score_rand * 100:2f}%")
+
+        experiment_csv.writerow(row)
 
         for learning_rate in [0.05]:
             for balance_coefficient in [1]:
@@ -150,12 +163,13 @@ if __name__ == "__main__":
                     "balance_coefficient": balance_coefficient,
 
                 }
-                score = experiment(**experiment_config)
+                score_nmi, score_rand = experiment(**experiment_config)
                 row = {
                     "experiment_no": i,
                     "learning_rate": learning_rate,
                     "balance_coefficient": balance_coefficient,
-                    "score": score
+                    "score_nmi": score_nmi,
+                    "score_rand": score_rand
                 }
                 experiment_csv.writerow(row)
                 i += 1
